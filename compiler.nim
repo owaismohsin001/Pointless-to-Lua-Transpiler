@@ -496,7 +496,7 @@ proc dispatch(immut_env: Env, immut_node: ASTNode, main: bool, immut_traceLocs: 
           exp.add("};")
           evaluated_export = exp
 
-        let between = if main: "try(\n\toutput, \n\tfunction(err) \n\t\tprint(debug.traceback())\n\t\treturn err.getError == nil and err or err:getError()\n\tend\n):getOutput()\n"
+        let between = if main: "try(\n\toutput, \n\tfunction(err) \n\t\tprint(debug.traceback())\n\t\tprint(err.getError == nil and err or err:getError())\n\t\tos.exit()\n\tend\n):getOutput()\n"
                       else: "\n"
         return evaluated_imports & "\n" & evaluated_defs & between & evaluated_export
 
