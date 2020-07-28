@@ -1,4 +1,4 @@
-from os import existsFile, existsDir, createDir, copyFile
+from os import existsFile, existsDir, createDir, copyFile, commandLineParams
 import location
 import sets
 import ASTNode
@@ -574,56 +574,6 @@ proc dispatch(immut_env: Env, immut_node: ASTNode, main: bool, immut_traceLocs: 
       of Node.Def: quit "We hate defs"
       of Node.Export: quit "We hate exports"
 
-let program = """
-isEmpty(list) = list == Empty
-head(list) = list.!getHead
-tail(list) = list.!getTail
-
-take(n, list) =
-  if n < 1 then []
-  else if isEmpty(list) then []
-  else [head(list)] ++ take(n - 1, tail(list))
-
-infinityFrom(n) = [n] ++ infinityFrom(n+1)
-
-reduce(func, acc, list) =
-  if isEmpty(list) then acc
-  else reduce(func, func(acc, head(list)), tail(list))
-
-filter(func, list) =
-  if isEmpty(list) then []
-
-  else if func(head(list))
-    then [head(list)] ++ filter(func, tail(list))
-
-  else filter(func, tail(list))
-
-map(func, list) =
-  if isEmpty(list) then []
-  else [func(head(list))] ++ map(func, tail(list))
-
-concatMap(func, lists) = lists |> map(func) |> concat
-concat(lists) =
-  if isEmpty(lists) then []
-  else head(lists) ++ concat(tail(lists))
-
-sum(list) = reduce((a, b) => a+b, 0, list)
-
-multiply(list) = reduce((a, b) => a*b, 1, list)
-
-range(init, count) = infinityFrom(init)
-                     |> take(count)
-
-output = [
-          (for i in range(1, 4) yield i)
-          |> filter(n => n!=3)
-          |> map(n => n**2)
-          |> sum
-          |> range(1)
-          |> multiply
-        ]
-"""
-
 proc compile(program: string, name: string, main: bool) : string =
   let toks = getToks(program, name)
   let ast = makeast(toks)
@@ -640,7 +590,17 @@ proc compile(program: string, name: string, main: bool) : string =
   var code = eval[string](env, ast, main = main)
   return "local filename__ = '" & name & "'\n" & declarations & "\n" & code
 
-let name = "program"
+let commands = commandLineParams().map(proc(x: TaintedString) : string = $x)
+if len(commands) != 1:
+  quit "Wrong amount of parameters, the correct format is, [compiler-name] [file-name]"
+
+if not existsFile(commands[0]):
+  let error = returnPtlsError("IO Error")
+  error.msg = "The file " & commands[0] & " doesn't exist"
+  raise error
+
+let name = commands[0].split(".")[0]
+let program = @(readFile(commands[0])).filter(proc(x: char) : bool = x!='\r').join("")
 let compiled_text = "require 'PtlsRuntime'\n" & compile(program, name, true)
 if not existsDir("output"):
   createDir("output")
