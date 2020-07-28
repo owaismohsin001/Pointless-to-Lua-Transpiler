@@ -1,5 +1,3 @@
-import "ops.ptls" as ops
-
 isEmpty(list) = list == Empty
 head(list) = list.!getHead
 tail(list) = list.!getTail
