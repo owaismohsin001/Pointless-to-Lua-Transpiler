@@ -1,0 +1,16 @@
+import "x.ptls" as x
+import "y.ptls" as y
+import "truth.ptls" as prelude
+
+sum(list) = prelude.reduce((a, b) => a+b, 0, list)
+
+multiply(list) = prelude.reduce((a, b) => a*b, 1, list)
+
+output = [
+          [1,2,3,4]
+          |> prelude.filter(n => n!=3)
+          |> prelude.map(n => n**2)
+          |> sum
+          |> prelude.range(1)
+          |> multiply
+        ] ++ [x.xo, y.yo]
