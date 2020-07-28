@@ -35,7 +35,7 @@ sum(list) = reduce((a, b) => a+b, 0, list)
 multiply(list) = reduce((a, b) => a*b, 1, list)
 
 range(init, count) = infinityFrom(init)
-                     |> take(count) + 8
+                     |> take(count)
 
 output = [
           (for i in range(1, 4) yield i)
