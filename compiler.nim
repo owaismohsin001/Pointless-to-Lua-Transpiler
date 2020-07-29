@@ -522,8 +522,9 @@ proc dispatch(immut_env: Env, immut_node: ASTNode, main: bool, immut_traceLocs: 
         return """try(
           """ & "function() return " & trial_body & " end" & """,
           function(err)
-            local caught__ = function() return err end;
-            return ((""" & catch_condition & """)(caught__):is_true() and ((""" & handler & """)(caught__)) or error(caught__()))
+            local caught__ = function() return err.value end;
+            local err__ = function() return err end;
+            return ((""" & catch_condition & """)(caught__):is_true() and ((""" & handler & """)(caught__)) or error(err__()))
           end
         )"""
 
