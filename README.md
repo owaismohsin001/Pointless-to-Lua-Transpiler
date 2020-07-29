@@ -10,3 +10,8 @@ So basically, file name orf the compiler followed by that of the source file you
 ```
 [compiler-exe-name] [source-file-name]
 ```
+To run the generated file you should look at the generated folder named `output` and your files will be avalible there.  Then you can run them like this.
+```
+[source-file-name].lua
+```
+so, for examle `example.ptls` would turn into `example.lua`.
