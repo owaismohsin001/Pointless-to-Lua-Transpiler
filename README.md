@@ -16,4 +16,4 @@ To run the generated file you should look at the generated folder named `output`
 ```
 so, for examle `example.ptls` would turn into `example.lua`.
 # Current goal
-Due to the runtime being elatively large and being written in a dynamic language, it's still quite buggy so reports or/and PRs for ficxing these pesky bus would be highly appreciated.
+Due to the runtime being relatively large and being written in a dynamic language, it's still quite buggy so reports or/and PRs for ficxing these pesky bus would be highly appreciated.
