@@ -1242,7 +1242,7 @@ function PtlsNumber.create(num)
   end;
 
   this.modded = function(this, other)
-    PtlsValue.sameTypes(this, other, Value.modded)
+    PtlsValue.sameTypes(this, other, PtlsValue.modded)
     return PtlsNumber.create(this.value % other.value):locate(this.loc)
   end;
 
