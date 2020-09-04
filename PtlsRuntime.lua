@@ -6,6 +6,16 @@ function map(tbl, f)
     return t
 end
 
+function if_expression(cond, act_true, act_false)
+  condition = cond()
+  if condition then
+    return act_true()
+  else
+    if act_false == nil then error(PtlsError.create("Match Error", "None of the avalible conditions matched" .. condition.type_, condition)) end
+    return act_false()
+  end
+end
+
 function try(f, catch_f)
   local status, exception = pcall(f)
   if not status then

@@ -402,10 +402,10 @@ proc dispatch(immut_env: Env, immut_node: ASTNode, main: bool, immut_traceLocs: 
 
       of Node.Conditional:
         let condition = eval[string](env, node.ifClause)
-        var str =  condition & ":is_true() and " & eval[string](env, node.thenExpr)
+        var str =  "function() return " & condition & ":is_true() end, function() return " & eval[string](env, node.thenExpr) & " end"
         if node.elseExpr != nil:
-          str.add(" or " & eval[string](env, node.elseExpr))
-        return "(" & str & ")"
+          str.add(", function() return " & eval[string](env, node.elseExpr) & " end")
+        return "if_expression(" & str & ")"
 
       of Node.Dict:
         return "(PtlsDict.create({" & node.dict_elems.map(proc(n: ASTNode) : string = "[" & eval[string](env, n.key) & "] = " & eval[string](env, n.val)).join(";\n") & "})" &
