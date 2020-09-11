@@ -32,11 +32,10 @@ proc createEnv(parent: Env = nil) : Env =
   env.globals = globals
   return env
 
-
 proc addDefName(this: Env, name: string, loc: Location) =
   if this.defs.contains(name):
     let error = returnPtlsError("Name Error");
-    error.msg = "Duplicate definition for name '" & name & "'"
+    error.msg = "Duplicate definition for name '" & name[0..len(name)-2] & "'"
     error.locs.add(loc)
     raise error;
   this.defs.incl(name)
@@ -60,7 +59,7 @@ proc existsDefName(this: Env, name: string, loc: Location) =
 
   let error = returnPtlsError("Name Error");
   error.locs.add(loc)
-  error.msg = "No definition for name '" & name & "'"
+  error.msg = "No definition for name '" & name[0..len(name)-2] & "'"
   raise error
 
 # Forward Declarations
@@ -105,7 +104,7 @@ proc declare(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]
 # Undeclared variabele error
 proc noDefinition(name : string, loc : Location) =
   let error = returnPtlsError("Name Error");
-  error.msg = "No definition for name '" & name & "'"
+  error.msg = "No definition for name '" & name[0..len(name)-2] & "'"
   error.locs.add(loc)
   raise error
 
@@ -113,7 +112,7 @@ proc checkNoDefinition(env : Env, name : string, loc: Location) =
   existsDefName(env, name, loc)
   return
 
-# Make sure no undeclared variables are used
+# Appends one to every variable name, for reasons
 proc appendOne(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : bool{.discardable.} =
   case node.NodeType:
     of Node.Array:
@@ -257,7 +256,7 @@ proc appendOne(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @
     of Node.Blank: quit "We hate blanks"
     of Node.Def: quit "We hate defs"
 
-
+# Make sure no undeclared variables are used
 proc validate(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : bool{.discardable.} =
   case node.NodeType:
     of Node.Array:
