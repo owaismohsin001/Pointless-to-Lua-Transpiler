@@ -69,6 +69,7 @@ proc compile(program: string, name: string, main: bool) : string
 proc declare(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : string
 proc dispatch(immut_env: Env, immut_node: ASTNode, main: bool, immut_traceLocs: seq[Location] = @[]) : string
 proc validate(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : bool{.discardable.}
+proc appendOne(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : bool{.discardable.}
 proc eval[T](env: Env, node: ASTNode, fun: proc(env: Env, node: ASTNode, main: bool, immut_traceLocs: seq[Location] = @[]) : T = dispatch, main: bool = false) : T{.discardable.}
 
 # Declarator, it forward declares functions
@@ -113,6 +114,150 @@ proc checkNoDefinition(env : Env, name : string, loc: Location) =
   return
 
 # Make sure no undeclared variables are used
+proc appendOne(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : bool{.discardable.} =
+  case node.NodeType:
+    of Node.Array:
+      for elem in node.array_elems:
+        eval[bool](env, elem, fun = appendOne)
+      return
+
+    of Node.BinaryOp:
+      eval[bool](env, node.bin_lhs, fun = appendOne)
+      eval[bool](env, node.bin_rhs, fun = appendOne)
+      return
+
+    of Node.Bool:
+      return
+
+    of Node.Call:
+      eval[bool](env, node.reference, fun = appendOne)
+      for arg in node.refered:
+        eval[bool](env, arg, fun = appendOne)
+      return
+
+    of Node.Conditional:
+      eval[bool](env, node.ifClause, fun = appendOne)
+      eval[bool](env, node.thenExpr, fun = appendOne)
+      if node.elseExpr != nil:
+        eval[bool](env, node.elseExpr, fun = appendOne)
+      return
+
+    of Node.Dict:
+      for pair in node.dict_elems:
+        eval[bool](env, pair.key, fun = appendOne)
+        eval[bool](env, pair.val, fun = appendOne)
+      return
+
+    of Node.Export:
+      for exp in node.exports:
+        eval[bool](env, exp, fun = appendOne)
+      return
+
+    of Node.FieldRef:
+      eval[bool](env, node.label, fun = appendOne)
+      return
+
+    of Node.Func:
+      let new_env = env.spawn()
+      eval[string](new_env, node, fun = declare)
+      eval[bool](new_env, node.fun_body, fun = appendOne)
+      for param in node.func_params:
+        eval[bool](new_env, param, fun = appendOne)
+      return
+
+    of Node.Import:
+      if not existsFile(node.path.strValue):
+        let error = returnPtlsError("Import Error")
+        error.msg = "No file at '" & node.path.strValue & "' exists"
+        error.locs.add(node.location)
+        raise error
+      eval[bool](env, node.as_node, fun = appendOne)
+      return
+
+    of Node.Index:
+      eval[bool](env, node.index_lhs, fun = appendOne)
+
+    of Node.Label:
+      return
+
+    of Node.List:
+      for elem in node.list_elems:
+        eval[bool](env, elem, fun = appendOne)
+      return
+
+    of Node.Name:
+      node.identifier &= "1"
+      return
+
+    of Node.Number:
+      return
+
+    of Node.Object:
+      let new_env = env.spawn()
+      let programNode = ASTNode(NodeType: Node.Program, defs: node.obj_defs, export_name: nil)
+      eval[string](new_env, programNode, fun = declare)
+      return
+
+    of Node.Program:
+      for n in node.imports:
+        eval[bool](env, n, fun = appendOne)
+
+      for def in node.defs:
+        eval[bool](env, def.lhs, fun = appendOne)
+        eval[bool](env, def.rhs, fun = appendOne)
+
+      if not isNil(node.export_name):
+        eval[bool](env, node.export_name, fun = appendOne)
+      return
+
+    of Node.Requires:
+      eval[bool](env, node.requirement, fun = appendOne)
+      eval[bool](env, node.required, fun = appendOne)
+
+    of Node.Set:
+      for elem in node.set_elems:
+        eval[bool](env, elem, fun = appendOne)
+      return
+
+    of Node.String:
+      return
+
+    of Node.Throw:
+      eval[bool](env, node.thrown_error, fun = appendOne)
+
+    of Node.Try:
+      eval[bool](env, node.trial_body, fun = appendOne)
+      eval[bool](env, node.catch_condition, fun = appendOne)
+      eval[bool](env, node.handler, fun = appendOne)
+
+    of Node.Tuple:
+      for elem in node.tuple_elems:
+        eval[bool](env, elem, fun = appendOne)
+      return
+
+    of Node.UnaryOp:
+      eval[bool](env, node.unary_node, fun = appendOne)
+      return
+
+    of Node.Where:
+      let new_env = env.spawn()
+      let programNode = ASTNode(NodeType: Node.Program, defs: node.where_clause.obj_defs, export_name: nil)
+      eval[string](new_env, programNode, fun = declare)
+      eval[bool](new_env, programNode, fun = appendOne)
+      eval[bool](new_env, node.where_body, fun = appendOne)
+      return
+
+    of Node.With:
+      eval[bool](env, node.with_body, fun = appendOne)
+      for def in node.with_defs:
+        eval[bool](env, def.rhs, fun = appendOne)
+      return
+
+    of Node.Pair: quit "We hate pairs"
+    of Node.Blank: quit "We hate blanks"
+    of Node.Def: quit "We hate defs"
+
+
 proc validate(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[]) : bool{.discardable.} =
   case node.NodeType:
     of Node.Array:
@@ -246,6 +391,8 @@ proc validate(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @[
 
     of Node.With:
       eval[bool](env, node.with_body, fun = validate)
+      for def in node.with_defs:
+        eval[bool](env, def.rhs, fun = validate)
       return
 
     of Node.Pair: quit "We hate pairs"
@@ -484,19 +631,19 @@ proc dispatch(immut_env: Env, immut_node: ASTNode, main: bool, immut_traceLocs: 
         if exports == nil:
           var exp = "return {"
           for name in env.defs:
-            let obj = "['" & name & "'] = " & name & ";\n"
+            let obj = "['" & name[0..len(name)-2] & "'] = " & name & ";\n"
             exp.add(obj)
           exp.add("};")
           evaluated_export = exp
         else:
           var exp = "return {"
           for nameNode in exports.exports:
-            let obj = "['" & nameNode.identifier & "'] = " & nameNode.identifier & ";\n"
+            let obj = "['" & nameNode.identifier & "'] = " & nameNode.identifier[0..len(nameNode.identifier)-2] & ";\n"
             exp.add(obj)
           exp.add("};")
           evaluated_export = exp
 
-        let between = if main: "try(\n\toutput, \n\tfunction(err) \n\t\tprint(debug.traceback())\n\t\tprint(err.getError == nil and err or err:getError())\n\t\tos.exit()\n\tend\n):getOutput()\n"
+        let between = if main: "try(\n\toutput1, \n\tfunction(err) \n\t\tprint(debug.traceback())\n\t\tprint(err.getError == nil and err or err:getError())\n\t\tos.exit()\n\tend\n):getOutput()\n"
                       else: "\n"
         return evaluated_imports & "\n" & evaluated_defs & between & evaluated_export
 
@@ -579,12 +726,13 @@ proc compile(program: string, name: string, main: bool) : string =
   let toks = getToks(program, name)
   let ast = makeast(toks)
   let env = createEnv()
+  discard eval[bool](env, ast, fun = appendOne)
   var declarations : string
   try:
     declarations = eval[string](env, ast, fun = declare)
     discard eval[bool](env, ast, fun = validate)
     if main:
-      checkNoDefinition(env, "output", ast.location)
+      checkNoDefinition(env, "output1", ast.location)
   except PtlsError as err:
     echo err.locs.deduplicate.join("\n")
     raise
