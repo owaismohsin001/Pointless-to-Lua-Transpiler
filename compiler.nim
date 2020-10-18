@@ -193,8 +193,9 @@ proc appendOne(env: Env, node: ASTNode, main: bool, traceLocs: seq[Location] = @
 
     of Node.Object:
       let new_env = env.spawn()
+      for def in node.obj_defs:
+        eval[bool](new_env, def.rhs, fun = appendOne)
       let programNode = ASTNode(NodeType: Node.Program, defs: node.obj_defs, export_name: nil)
-      eval[string](new_env, programNode, fun = declare)
       return
 
     of Node.Program:
