@@ -345,10 +345,14 @@ function  PtlsFunc.create(fun)
   end
 
   this.getValue = function(this, arg)
+    function getArg(arg)
+      if arg.type_ == "PtlsThunk" then return arg() else return arg end
+    end
+
     if arg.type_ == "PtlsList" then return nil end
     for calcArg, calcRes in pairs(this.values) do
-      if calcArg:equaled(arg):is_true() then
-        return PtlsThunk.create(function() return calcRes end)
+      if calcArg():equaled(arg):is_true() then
+        return calcRes
       end
     end
     return nil
@@ -357,7 +361,7 @@ function  PtlsFunc.create(fun)
   setmetatable(this, {
     __index = PtlsValue;
     __call = function(this, arg)
-      val = this:getValue(arg)
+      val = this:getValue(arg())
       if val ~= nil then return val end
       lastTicks = ticks
       res = this.fun(arg)
