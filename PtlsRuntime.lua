@@ -1,3 +1,5 @@
+ticks = 0
+
 function map(tbl, f)
     local t = {}
     for k,v in pairs(tbl) do
@@ -342,10 +344,27 @@ function  PtlsFunc.create(fun)
     return "<function>"
   end
 
+  this.getValue = function(this, arg)
+    if arg.type_ == "PtlsList" then return nil end
+    for calcArg, calcRes in pairs(this.values) do
+      if calcArg:equaled(arg):is_true() then
+        return PtlsThunk.create(function() return calcRes end)
+      end
+    end
+    return nil
+  end
+
   setmetatable(this, {
     __index = PtlsValue;
-    __call = function(this, ...)
-      return this.fun(...)
+    __call = function(this, arg)
+      val = this:getValue(arg)
+      if val ~= nil then return val end
+      lastTicks = ticks
+      res = this.fun(arg)
+      if ticks == lastTicks then
+        this.values[arg] = res
+      end
+      return res
     end
   })
   return this
@@ -712,6 +731,7 @@ PtlsLabel.create = function(value)
         return function()
           return PtlsBuiltIn.create(
             function(inp)
+              ticks = ticks + 1
               return this.readFile(this, inp, false)
           end)
         end
@@ -722,6 +742,7 @@ PtlsLabel.create = function(value)
         return function()
           return PtlsBuiltIn.create(
             function(inp)
+              ticks = ticks + 1
               return this.readFile(this, inp, true)
             end
           )
@@ -733,6 +754,7 @@ PtlsLabel.create = function(value)
         return function()
           return PtlsBuiltIn.create(
             function(inp)
+              ticks = ticks + 1
               return this.getDebug(this, inp)
             end
           )
@@ -741,16 +763,19 @@ PtlsLabel.create = function(value)
 
       ["!getRand"] = function(this)
         this.checkLabel(this, "IO", "!getRand")
+        ticks = ticks + 1
          return function() return PtlsNumber.create(math.random(0, 100)) end
       end;
 
       ["!getSet"] = function(this)
         this.checkLabel(this, "IO", "!getRand")
+        ticks = ticks + 1
         return function() return PtlsSet.create({}) end
       end;
 
       ["!getSet"] = function(this)
         this.checkLabel(this, "Empty", "!getSet")
+        ticks = ticks + 1
         return function() return PtlsSet.create({}) end
       end;
 
