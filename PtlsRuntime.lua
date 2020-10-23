@@ -1072,6 +1072,8 @@ PtlsString.create = function(strValue)
       return this.properties[other](this)
     end;
 
+  this.getHash = function(this) return hash.sha1(this.value) end
+
   this.added = function(this, other)
     PtlsValue.sameTypes(this, other, PtlsValue.added)
     return PtlsString.create(this.value .. other.value):locate(this.loc)
