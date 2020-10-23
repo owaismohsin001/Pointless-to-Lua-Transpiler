@@ -754,8 +754,6 @@ let compiled_text = "require 'PtlsRuntime'\n" & compile(program, name, true)
 if not existsDir("output"):
   createDir("output")
 copyFile("PtlsRuntime.lua", "output/PtlsRuntime.lua")
-writeFile("output/" & name & ".lua",
-"""local base_path = string.match(arg[0], '^(.-)[^/\\]*$')
-package.path = string.format("%s;%s?.lua", package.path, base_path)
-""" & "\n" & compiled_text)
+copyFile("hashLib.lua", "output/luaHash.lua")
+writeFile("output/" & name & ".lua", compiled_text)
 echo compiled_text

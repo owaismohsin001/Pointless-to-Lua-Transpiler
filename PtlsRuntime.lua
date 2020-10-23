@@ -1,3 +1,5 @@
+hash = require("luaHash")
+
 ticks = 0
 
 function map(tbl, f)
@@ -170,6 +172,8 @@ PtlsValue = {
       error(PtlsError.create("TypeError", "Can't negate " .. this.type_, this))
     end;
 
+    is_lazy_arg = false;
+
     notted = function(this)
       error(PtlsError.create("TypeError", "Can't not " .. this.type_, this))
     end;
@@ -252,6 +256,13 @@ PtlsValue = {
 
     toList = function(this)
       error(PtlsError.create("TypeError", "Expected PtlsList but got " .. this.type_, this))
+    end;
+
+    unhashables = 0;
+
+    getHash = function(this)
+      this.unhashables = this.unhashables + 1
+      return "Unhashable" .. tostring(this.unhashables) .. this.type_
     end;
 
     toString = function(this)
@@ -345,28 +356,20 @@ function  PtlsFunc.create(fun)
   end
 
   this.getValue = function(this, arg)
-    function getArg(arg)
-      if arg.type_ == "PtlsThunk" then return arg() else return arg end
-    end
-
-    if arg.type_ == "PtlsList" then return nil end
-    for calcArg, calcRes in pairs(this.values) do
-      if calcArg():equaled(arg):is_true() then
-        return calcRes
-      end
-    end
-    return nil
+    if arg().is_lazy_arg then return nil end
+    return this.values[arg():getHash()]
   end
 
   setmetatable(this, {
     __index = PtlsValue;
     __call = function(this, arg)
-      val = this:getValue(arg())
+      val = this:getValue(arg)
       if val ~= nil then return val end
       lastTicks = ticks
       res = this.fun(arg)
       if ticks == lastTicks then
-        this.values[arg] = res
+        local hash = arg():getHash()
+        this.values[hash] = res
       end
       return res
     end
@@ -425,6 +428,17 @@ PtlsArray.create = function(elems)
     ["!getLength"] = function(this) return function() return PtlsNumber.create(tablelength(this.value)) end end;
     };
   }, PtlsArray)
+
+  this.getHash = function(this)
+    local str = ""
+    local i = 0
+    local length = tablelength(this.value)
+    while i < length do
+      str = str .. this.value[i]:getHash()
+      i = i+1
+    end
+    return str .. "IsAnArray"
+  end
 
   this.getProperty = function(this, other)
     if contains(this.properties, other) then return this.properties[other](this) end
@@ -495,6 +509,8 @@ function PtlsBool.create(val)
     if contains(this.properties, other) then return this.properties[other](this) end
     return PtlsValue.getProperty(this, other)
   end;
+
+  this.getHash = function(this) return hash.sha1(tostring(this.value)) .. "IsABool" end
 
   this.notted = function(this)
     return PtlsBool.create(not this.value):locate(this.loc)
@@ -582,6 +598,17 @@ PtlsDict.create = function(obj)
   this.getProperty = function(this, other)
     if contains(this.properties, other) then return this.properties[other](this) end
     return PtlsValue.getProperty(this, other)
+  end;
+
+  this.getHash = function(this, other)
+    local str = ""
+    local length = tablelength(this.value)
+    local count = 0
+    for k, v in pairs(this.value) do
+      str = str .. (k:getHash() .. "colon" .. v:getHash())
+      count = count + 1
+    end
+    return str .. "IsADict"
   end;
 
   this.inside = function(this, other)
@@ -677,6 +704,14 @@ PtlsSet.create = function(value)
     if contains(this.properties, other) then return this.properties[other](this) end
     return PtlsValue.getProperty(this, other)
   end;
+
+  this.toString = function(this)
+    local tb = {}
+    for k, v in pairs(make_set(this.value)) do
+      table.insert(tb, v:getHash())
+    end
+    return table.concat(tb, "") .. "IsASet"
+  end
 
   this.inside = function(this, other)
     for k, v in pairs(this.value) do
@@ -894,6 +929,10 @@ PtlsLabel.create = function(value)
     return PtlsTuple.create(copy(tuple().value), this):locate(this.loc)
   end;
 
+  this.getHash = function(this, obj)
+    return hash.sha1(this.value) .. "IsALabal"
+  end
+
   this.equaled = function(this, other)
     if this.type_ ~= other.type_ then return PtlsBool.create(false):locate(this.loc) end
     return PtlsBool.create(this.value == other.value):locate(this.loc)
@@ -948,6 +987,17 @@ PtlsObject.create = function(obj, label)
     return this.value[other]
   end;
 
+  this.getHash = function(this, other)
+    local str = ""
+    local counter = 0
+    local length = tablelength(this.value)
+    for k, v in pairs(this.value) do
+      str = str .. (hash.sha1(k) .. "equals" .. v():getHash())
+      counter = counter + 1
+    end
+    return this.label:getHash() .. (str .. "IsAnObject")
+  end;
+
   this.updateField = function(this, name, res)
     local newEnv = copy(this.value)
     if contains(newEnv, name) then
@@ -995,7 +1045,6 @@ PtlsObject.create = function(obj, label)
     return (this.label.value == "PtlsObject" and "" or this.label:toString()) .. "{" .. str .. "}"
   end;
 
-
   setmetatable(this, {
       __index = PtlsValue;
       __call = PtlsValueCall;
@@ -1027,6 +1076,10 @@ PtlsString.create = function(strValue)
     PtlsValue.sameTypes(this, other, PtlsValue.added)
     return PtlsString.create(this.value .. other.value):locate(this.loc)
   end;
+
+  this.toString = function(this)
+    return hash.sha1(this.value) .. "IsAString"
+  end
 
   this.equaled = function(this, other)
     if this.type_ ~= other.type_ then return PtlsBool.create(false):locate(this.loc) end
@@ -1071,6 +1124,10 @@ PtlsTuple.create = function(tuple, label)
         end;
     };
   }, PtlsTuple)
+
+  this.getHash = function(this)
+    return (this.label.value == "PtlsTuple" and "" or this.label:getHash()) .. (table.concat(map(this.value, function(x) return x():getHash() end), "") .. "IsATuple")
+  end;
 
   this.getProperty = function(this, other)
     if not contains(this.properties, other) then return PtlsValue.getProperty(this, other) end
@@ -1152,6 +1209,7 @@ PtlsList.create = function(head, tail)
   local this = setmetatable({
       head = function(this) return head end;
       tail = function(this) return tail end;
+      is_lazy_arg = true;
       type_ = "PtlsList";
 
       properties = {
@@ -1278,6 +1336,10 @@ function PtlsNumber.create(num)
 
   this.negate = function(this)
     return PtlsNumber.create(this.value * -1):locate(this.loc)
+  end;
+
+  this.getHash = function(this)
+    return hash.sha1(tostring(this.value)) .. "IsANumber"
   end;
 
   this.modded = function(this, other)
