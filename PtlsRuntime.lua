@@ -1072,16 +1072,12 @@ PtlsString.create = function(strValue)
       return this.properties[other](this)
     end;
 
-  this.getHash = function(this) return hash.sha1(this.value) end
+  this.getHash = function(this) return hash.sha1(this.value) .. "IsAString" end  
 
   this.added = function(this, other)
     PtlsValue.sameTypes(this, other, PtlsValue.added)
     return PtlsString.create(this.value .. other.value):locate(this.loc)
   end;
-
-  this.toString = function(this)
-    return hash.sha1(this.value) .. "IsAString"
-  end
 
   this.equaled = function(this, other)
     if this.type_ ~= other.type_ then return PtlsBool.create(false):locate(this.loc) end
