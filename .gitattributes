@@ -1,2 +1,1 @@
-special-vendored-path/* linguist-vendored
 hashLib.lua linguist-vendored=false
